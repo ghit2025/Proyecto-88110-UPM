@@ -1,47 +1,34 @@
-; ============================================================
-; Proyecto de Programacion en Ensamblador 88110.
-; IMPORTANTE:
-;   - No usar variables temporales en direcciones absolutas.
-;   - Usar la pila para parametros y variables locales.
-;   - r30 = SP, r31 = FP, r29 = retorno.
-;   - El bloque BuscaMax proporcionado queda al final sin tocar.
-; ============================================================
-
-
-; ============================================================
-; DATOS DE PRUEBA PARA LONGCAD
-; ============================================================
+; =========================
+; datos prueba LongCad
+; =========================
 
         org 0x8000
 
-CAD_LONG_1:
+CAD1:
         data "Prueba\0"
 
 
-; ============================================================
-; PROGRAMA PRINCIPAL DE PRUEBA (De momento probaremos LongCad.)
-; ============================================================
+; =========================
+; programa principal
+; =========================
 
         org 0x8400
 
 ppal:
-        or      r30, r0, 0xF000      ; Inicializamos SP en una zona alta permitida
-        or      r31, r30, r30        ; Inicializamos FP igual que SP
+        or      r30, r0, 0xF000      ; pila
+        or      r31, r30, r30        ; fp
 
-        LEA     (r10, CAD_LONG_1)    ; r10 = direccion de la cadena "Prueba\0"
+        LEA     (r10, CAD1)          ; dir cadena
+        PUSH    (r10)                ; parametro
+        bsr     LongCad
+        addu    r30, r30, 4          ; quito parametro
 
-        PUSH    (r10)                ; Primer argumento: direccion de la cadena
-        bsr     LongCad              ; Llamada a LongCad(cadena)
-        addu    r30, r30, 4          ; El llamante limpia el parametro de la pila
-
-        stop                         ; Al parar, miraremos r29 y r30
+        stop
 
 
-; ============================================================
-; SUBRUTINAS DEL PROYECTO
-; De momento dejamos stubs para que existan todas las etiquetas.
-; Luego iremos implementandolas una a una.
-; ============================================================
+; =========================
+; subrutinas
+; =========================
 
 LongCad:
         jmp     (r1)
@@ -104,9 +91,23 @@ Verifica:
 
 
 
-; ============================================================
-; BLOQUE BuscaMax PROPORCIONADO NO MODIFICAR NINGUNA LINEA DE BuscaMax
-; ============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+; =========================
+; BuscaMax dada
+; no tocar
+; =========================
 
 ;
 ; Debe incorporar este fichero con TODAS sus l�neas, sin modificar
