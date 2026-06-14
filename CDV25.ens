@@ -57,10 +57,20 @@ ENDMACRO
 ; datos prueba 
 ; =========================
 
-       org 0x8000
 
-MAPA1:
-        data 0x54
+    org 0x8000
+
+CMPR1:
+        data 0x0b010044, 0x10102400, 0x74004000, 0x20736572
+        data 0x73697274, 0x04000274, 0x00016769, 0x6d6f6304
+        data 0x00046e65, 0x206f6704, 0x75206e65, 0x61060018
+        data 0x65202c6c, 0x7270206c, 0x72656d69, 0x2006000c
+        data 0x2e657571, 0x00002e2e
+
+        org 0x8100
+
+DESC1:
+        res 96
 
 
 ; =========================
@@ -73,12 +83,12 @@ ppal:
         or      r30, r0, 0xF000      ; pila
         or      r31, r30, r30        ; fp
 
-        LEA     (r10, MAPA1)         ; mapa
-        or      r11, r0, 3           ; bit 3
+        LEA     (r10, CMPR1)         ; comprimido
+        LEA     (r11, DESC1)         ; salida
 
-        PUSH    (r11)                ; NumBit
-        PUSH    (r10)                ; dir mapa
-        bsr     LeeBit
+        PUSH    (r11)                ; desc
+        PUSH    (r10)                ; com
+        bsr     Descomprime
 
         addu    r30, r30, 8          ; quito parametros
 
@@ -261,7 +271,132 @@ FinLB:
         jmp     (r1)
 ;-------------
 Descomprime:
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; fp fijo
+
+        ld      r10, r31, 8          ; com
+        ld      r11, r31, 12         ; desc
+
+        ld.bu   r12, r10, 0          ; long low
+        ld.bu   r13, r10, 1          ; long high
+        mulu    r13, r13, 256
+        addu    r12, r12, r13        ; longitud original
+
+        ld.bu   r14, r10, 2          ; M
+        mulu    r14, r14, 8          ; 8*M
+
+        ld.bu   r15, r10, 3          ; zona3 low
+        ld.bu   r13, r10, 4          ; zona3 high
+        mulu    r13, r13, 256
+        addu    r15, r15, r13        ; offset zona3
+
+        addu    r16, r10, 5          ; mapa bits
+        addu    r17, r10, r15        ; zona3
+
+        or      r18, r0, 0           ; pos desc
+        or      r19, r0, 0           ; pos zona3
+        or      r20, r0, 0           ; num bit
+
+CopIniD:
+        cmp     r5, r18, r14
+        bb1     hs, r5, BucD         ; ya copie 8*M
+
+        cmp     r5, r18, r12
+        bb1     hs, r5, FinD         ; texto corto
+
+        ld.bu   r21, r17, r19        ; zona3[pos]
+        st.b    r21, r11, r18        ; desc[pos]
+
+        addu    r18, r18, 1
+        addu    r19, r19, 1
+        br      CopIniD
+
+BucD:
+        cmp     r5, r18, r12
+        bb1     hs, r5, FinD         ; si pos >= long
+
+        PUSH    (r10)
+        PUSH    (r11)
+        PUSH    (r12)
+        PUSH    (r13)
+        PUSH    (r14)
+        PUSH    (r15)
+        PUSH    (r16)
+        PUSH    (r17)
+        PUSH    (r18)
+        PUSH    (r19)
+        PUSH    (r20)
+
+        PUSH    (r20)                ; num bit
+        PUSH    (r16)                ; mapa
+        bsr     LeeBit
+        addu    r30, r30, 8          ; quito params LeeBit
+
+        POP     (r20)
+        POP     (r19)
+        POP     (r18)
+        POP     (r17)
+        POP     (r16)
+        POP     (r15)
+        POP     (r14)
+        POP     (r13)
+        POP     (r12)
+        POP     (r11)
+        POP     (r10)
+
+        cmp     r5, r29, 0
+        bb1     eq, r5, LiteralD
+
+RefD:
+        ld.bu   r22, r17, r19        ; P low
+        addu    r26, r19, 1
+        ld.bu   r13, r17, r26        ; P high
+        mulu    r13, r13, 256
+        addu    r22, r22, r13        ; P
+
+        addu    r26, r19, 2
+        ld.bu   r23, r17, r26        ; L
+
+        addu    r19, r19, 3          ; consumo referencia
+        or      r24, r0, 0           ; k
+
+BucRefD:
+        cmp     r5, r24, r23
+        bb1     hs, r5, FinRefD
+
+        addu    r25, r22, r24        ; P+k
+        ld.bu   r21, r11, r25        ; desc[P+k]
+        st.b    r21, r11, r18        ; desc[pos]
+
+        addu    r18, r18, 1
+        addu    r24, r24, 1
+        br      BucRefD
+
+FinRefD:
+        addu    r20, r20, 1
+        br      BucD
+
+LiteralD:
+        ld.bu   r21, r17, r19        ; caracter
+        st.b    r21, r11, r18
+
+        addu    r18, r18, 1
+        addu    r19, r19, 1
+        addu    r20, r20, 1
+        br      BucD
+
+FinD:
+        or      r21, r0, 0
+        st.b    r21, r11, r18        ; \0
+
+        or      r29, r12, r12        ; retorno = longitud
+
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
         jmp     (r1)
+;----------------------
 
 Verifica:
         jmp     (r1)
