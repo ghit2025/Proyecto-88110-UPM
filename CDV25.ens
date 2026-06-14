@@ -28,11 +28,44 @@ ENDMACRO
 ; =========================
 ; datos prueba LongCad
 ; =========================
+;        org 0x8000
+;
+;CAD1:
+;       data "Prueba\0"
+
+
+
+; =========================
+; datos prueba BuscaCar
+; =========================
+
+;        org 0x8000
+
+;CAR1:
+;        data 0x2A                 ; codigo ascii de *
+;
+;REF1:
+;        data "*2345*78*0\0"
+;
+;FROM1:
+;        data 4
+;
+;TO1:
+;        data 10
+
+; =========================
+; datos prueba CoincidenCad
+; =========================
 
         org 0x8000
 
 CAD1:
-        data "Prueba\0"
+        data "abcde\0"
+
+        org 0x8040
+
+CAD2:
+        data "abcXX\0"
 
 
 ; =========================
@@ -45,10 +78,14 @@ ppal:
         or      r30, r0, 0xF000      ; pila
         or      r31, r30, r30        ; fp
 
-        LEA     (r10, CAD1)          ; dir cadena
-        PUSH    (r10)                ; parametro
-        bsr     LongCad
-        addu    r30, r30, 4          ; quito parametro
+        LEA     (r10, CAD1)          ; cad1
+        LEA     (r11, CAD2)          ; cad2
+
+        PUSH    (r11)                ; segundo parametro
+        PUSH    (r10)                ; primer parametro
+        bsr     CoincidenCad
+
+        addu    r30, r30, 8          ; quito parametros
 
         stop
 
@@ -56,8 +93,9 @@ ppal:
 ; =========================
 ; subrutinas
 ; =========================
+; LongCad: Cuenta los caracteres de una cadena hasta encontrar un \0
 
-LongCad:
+LongCad: 
         PUSH    (r1)
         PUSH    (r31)
         or      r31, r30, 0          ; nuevo fp
@@ -84,11 +122,69 @@ FinLC:
 
 
 
-
+;=======BUSCARCAR
 BuscaCar:
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; fp fijo
+
+        ld      r10, r31, 8          ; C
+        ld      r11, r31, 12         ; ref
+        ld      r12, r31, 16         ; i = from
+        ld      r13, r31, 20         ; to
+
+BucBC:
+        cmp     r5, r12, r13
+        bb1     hs, r5, NoBC         ; si i >= to
+
+        ld.bu   r14, r11, r12        ; ref[i]
+        cmp     r5, r14, r10
+        bb1     eq, r5, SiBC         ; encontrado
+
+        addu    r12, r12, 1          ; i++
+        br      BucBC
+
+SiBC:
+        or      r29, r12, r12        ; retorno = i
+        br      FinBC
+
+NoBC:
+        or      r29, r13, r13        ; retorno = to
+
+FinBC:
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
         jmp     (r1)
 
+;-----------
+
 CoincidenCad:
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; fp fijo
+
+        ld      r10, r31, 8          ; cad1
+        ld      r11, r31, 12         ; cad2
+        or      r29, r0, 0           ; contador
+
+BucCC:
+        ld.bu   r12, r10, r29        ; cad1[i]
+        ld.bu   r13, r11, r29        ; cad2[i]
+
+        cmp     r5, r12, r13
+        bb1     ne, r5, FinCC        ; si son distintos
+
+        cmp     r5, r12, 0
+        bb1     eq, r5, FinCC        ; si llego a fin
+
+        addu    r29, r29, 1          ; contador++
+        br      BucCC
+
+FinCC:
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
         jmp     (r1)
 
 PoneBitA1:
