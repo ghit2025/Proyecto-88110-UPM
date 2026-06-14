@@ -54,18 +54,13 @@ ENDMACRO
 ;        data 10
 
 ; =========================
-; datos prueba CoincidenCad
+; datos prueba 
 ; =========================
 
-        org 0x8000
+       org 0x8000
 
-CAD1:
-        data "abcde\0"
-
-        org 0x8040
-
-CAD2:
-        data "abcXX\0"
+MAPA1:
+        data 0x54
 
 
 ; =========================
@@ -78,12 +73,12 @@ ppal:
         or      r30, r0, 0xF000      ; pila
         or      r31, r30, r30        ; fp
 
-        LEA     (r10, CAD1)          ; cad1
-        LEA     (r11, CAD2)          ; cad2
+        LEA     (r10, MAPA1)         ; mapa
+        or      r11, r0, 3           ; bit 3
 
-        PUSH    (r11)                ; segundo parametro
-        PUSH    (r10)                ; primer parametro
-        bsr     CoincidenCad
+        PUSH    (r11)                ; NumBit
+        PUSH    (r10)                ; dir mapa
+        bsr     LeeBit
 
         addu    r30, r30, 8          ; quito parametros
 
@@ -186,16 +181,85 @@ FinCC:
         POP     (r31)
         POP     (r1)
         jmp     (r1)
+;---------
+
 
 PoneBitA1:
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; fp fijo
+
+        ld      r10, r31, 8          ; dir mapa
+        ld      r11, r31, 12         ; num bit
+
+        divu    r12, r11, 8          ; byte = numbit / 8
+        mulu    r13, r12, 8
+        subu    r14, r11, r13        ; resto = numbit % 8
+
+        or      r15, r0, 0x80        ; mascara inicial
+
+BucPBA1:
+        cmp     r5, r14, 0
+        bb1     eq, r5, FinBucPBA1
+
+        divu    r15, r15, 2          ; mascara / 2
+        subu    r14, r14, 1
+        br      BucPBA1
+
+FinBucPBA1:
+        ld.bu   r16, r10, r12        ; byte actual
+        or      r16, r16, r15        ; pongo bit a 1
+        st.b    r16, r10, r12        ; guardo byte
+
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
         jmp     (r1)
 
 Comprime:
         jmp     (r1)
-
+;------------------------
 LeeBit:
-        jmp     (r1)
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; fp fijo
 
+        ld      r10, r31, 8          ; dir mapa
+        ld      r11, r31, 12         ; num bit
+
+        divu    r12, r11, 8          ; byte = numbit / 8
+        mulu    r13, r12, 8
+        subu    r14, r11, r13        ; resto = numbit % 8
+
+        or      r15, r0, 0x80        ; mascara inicial
+
+BucLB:
+        cmp     r5, r14, 0
+        bb1     eq, r5, FinBucLB
+
+        divu    r15, r15, 2          ; mascara / 2
+        subu    r14, r14, 1
+        br      BucLB
+
+FinBucLB:
+        ld.bu   r16, r10, r12        ; byte actual
+        and     r17, r16, r15        ; miro el bit
+
+        cmp     r5, r17, 0
+        bb1     eq, r5, CeroLB
+
+        or      r29, r0, 1           ; bit = 1
+        br      FinLB
+
+CeroLB:
+        or      r29, r0, 0           ; bit = 0
+
+FinLB:
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
+        jmp     (r1)
+;-------------
 Descomprime:
         jmp     (r1)
 
