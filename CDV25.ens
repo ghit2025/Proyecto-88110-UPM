@@ -1,4 +1,31 @@
 ; =========================
+; macros
+; =========================
+
+PUSH: MACRO(reg)
+        subu    r30, r30, 4 ; 1. Hacer hueco (bajar 4 escalones)
+        st      reg, r30, 0 ; 2. Guardar el dato en el nuevo hueco
+ENDMACRO
+
+POP: MACRO(reg)
+        ld      reg, r30, 0 ; 1. Recuperar el dato
+        addu    r30, r30, 4 ; 2. Cerrar el hueco (subir 4 escalones)
+ENDMACRO
+
+LEA: MACRO(reg, etq) ;Load Effective Address = Dame la dirección postal
+        or      reg, r0, low(etq) ; 1. Pega la mitad baja
+        or.u    reg, reg, high(etq ) ; 2. Pega la mitad alta
+ENDMACRO
+
+LOAD: MACRO(reg, etq) ;Dame el contenido de esa dirección = Abre el buzón
+        or      reg, r0, low(etq)
+        or.u    reg, reg, high(etq) ; hasta aqui es lo mismo que el macro LEA
+        ld      reg, reg, 0 ; Aqui carga en reg los contenidos que hay en la direccion reg 
+ENDMACRO
+
+
+
+; =========================
 ; datos prueba LongCad
 ; =========================
 
@@ -31,7 +58,32 @@ ppal:
 ; =========================
 
 LongCad:
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; nuevo fp
+
+        ld      r10, r31, 8          ; cadena
+        or      r29, r0, 0           ; contador
+
+BucLC:
+        ld.bu   r11, r10, r29        ; cadena[contador]
+        cmp     r12, r11, 0
+        bb1     eq, r12, FinLC       ; si es 0, fin
+
+        addu    r29, r29, 1          ; contador++
+        br      BucLC
+
+FinLC:
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
         jmp     (r1)
+
+
+
+
+
+
 
 BuscaCar:
         jmp     (r1)
