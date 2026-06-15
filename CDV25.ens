@@ -61,31 +61,35 @@ ENDMACRO
     org 0x8000
 
 TXT1:
-        data "tres tristes tigres comen trigo en un trigal, el primer tigre que...\0"
+        data "0123456789\0"
 
         org 0x8100
 
-COMP1:
-        res 128
+LONG1:
+        data 0
+
+LONG2:
+        data 0
 
 ; =========================
 ; programa principal
 ; =========================
-
-        org 0x8400
+  org 0x8400
 
 ppal:
         or      r30, r0, 0xF000      ; pila
         or      r31, r30, r30        ; fp
 
         LEA     (r10, TXT1)          ; texto
-        LEA     (r11, COMP1)         ; salida
+        LEA     (r11, LONG1)         ; long original
+        LEA     (r12, LONG2)         ; long final
 
-        PUSH    (r11)                ; comprdo
+        PUSH    (r12)                ; Long2
+        PUSH    (r11)                ; Long1
         PUSH    (r10)                ; texto
-        bsr     Comprime
+        bsr     Verifica
 
-        addu    r30, r30, 8          ; quito parametros
+        addu    r30, r30, 12         ; quito parametros
 
         stop
 
@@ -589,6 +593,102 @@ FinD:
 ;----------------------
 
 Verifica:
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; fp fijo
+
+        subu    r30, r30, 16         ; locales
+
+        ld      r10, r31, 8          ; texto
+        PUSH    (r10)
+        bsr     LongCad
+        addu    r30, r30, 4
+
+        st      r29, r31, -4         ; long original
+
+        ld      r10, r31, 12         ; Long1
+        st      r29, r10, 0
+
+        ; tam comprimido aprox = long + bytes mapa + 5
+        ld      r20, r31, -4
+        addu    r21, r20, 7
+        divu    r21, r21, 8          ; bytes mapa aprox
+        addu    r22, r20, r21
+        addu    r22, r22, 5
+        addu    r22, r22, 3
+        divu    r22, r22, 4
+        mulu    r22, r22, 4          ; ajustado a 4
+
+        subu    r30, r30, r22
+        or      r23, r30, r30        ; pila comprimido
+        st      r23, r31, -8
+
+        ; tam descomprimido = long + \0, ajustado a 4
+        ld      r20, r31, -4
+        addu    r24, r20, 1
+        addu    r24, r24, 3
+        divu    r24, r24, 4
+        mulu    r24, r24, 4
+
+        subu    r30, r30, r24
+        or      r25, r30, r30        ; pila descomprimido
+        st      r25, r31, -12
+
+        ; Comprime(texto, pila comprimido)
+        ld      r10, r31, 8
+        ld      r11, r31, -8
+
+        PUSH    (r11)
+        PUSH    (r10)
+        bsr     Comprime
+        addu    r30, r30, 8
+
+        ; Descomprime(pila comprimido, pila descomprimido)
+        ld      r10, r31, -8
+        ld      r11, r31, -12
+
+        PUSH    (r11)
+        PUSH    (r10)
+        bsr     Descomprime
+        addu    r30, r30, 8
+
+        ; guardo Long2
+        ld      r10, r31, 16
+        st      r29, r10, 0
+
+        ; comparo longitudes
+        ld      r20, r31, -4
+        cmp     r5, r20, r29
+        bb1     ne, r5, DifLongV
+
+        ; comparo contenido
+        ld      r10, r31, 8
+        ld      r11, r31, -12
+
+        PUSH    (r11)
+        PUSH    (r10)
+        bsr     CoincidenCad
+        addu    r30, r30, 8
+
+        ld      r20, r31, -4
+        cmp     r5, r29, r20
+        bb1     eq, r5, OkV
+
+DifContV:
+        sub     r29, r0, 2           ; -2 contenido distinto
+        br      FinV
+
+DifLongV:
+        sub     r29, r0, 1           ; -1 longitudes distintas
+        br      FinV
+
+OkV:
+        or      r29, r0, 0           ; correcto
+
+FinV:
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
         jmp     (r1)
 
 
