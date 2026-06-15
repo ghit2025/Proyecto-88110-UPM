@@ -60,18 +60,13 @@ ENDMACRO
 
     org 0x8000
 
-CMPR1:
-        data 0x0b010044, 0x10102400, 0x74004000, 0x20736572
-        data 0x73697274, 0x04000274, 0x00016769, 0x6d6f6304
-        data 0x00046e65, 0x206f6704, 0x75206e65, 0x61060018
-        data 0x65202c6c, 0x7270206c, 0x72656d69, 0x2006000c
-        data 0x2e657571, 0x00002e2e
+TXT1:
+        data "tres tristes tigres comen trigo en un trigal, el primer tigre que...\0"
 
         org 0x8100
 
-DESC1:
-        res 96
-
+COMP1:
+        res 128
 
 ; =========================
 ; programa principal
@@ -83,12 +78,12 @@ ppal:
         or      r30, r0, 0xF000      ; pila
         or      r31, r30, r30        ; fp
 
-        LEA     (r10, CMPR1)         ; comprimido
-        LEA     (r11, DESC1)         ; salida
+        LEA     (r10, TXT1)          ; texto
+        LEA     (r11, COMP1)         ; salida
 
-        PUSH    (r11)                ; desc
-        PUSH    (r10)                ; com
-        bsr     Descomprime
+        PUSH    (r11)                ; comprdo
+        PUSH    (r10)                ; texto
+        bsr     Comprime
 
         addu    r30, r30, 8          ; quito parametros
 
@@ -225,9 +220,204 @@ FinBucPBA1:
         POP     (r31)
         POP     (r1)
         jmp     (r1)
+;----- COMPRIME--------------
 
 Comprime:
+        PUSH    (r1)
+        PUSH    (r31)
+        or      r31, r30, 0          ; fp fijo
+
+        ld      r10, r31, 8          ; texto
+        ld      r11, r31, 12         ; comprdo
+
+        subu    r30, r30, 4          ; local P
+        or      r19, r30, 0          ; dir P
+
+        PUSH    (r10)
+        bsr     LongCad
+        addu    r30, r30, 4
+
+        ld      r10, r31, 8          ; texto
+        ld      r11, r31, 12         ; comprdo
+        or      r12, r29, r29        ; long texto
+
+        addu    r13, r12, 3          ; ajustar a mult 4
+        divu    r13, r13, 4
+        mulu    r13, r13, 4
+
+        subu    r30, r30, r13        ; zona3 temporal
+        or      r18, r30, 0          ; dir zona3 temp
+
+        addu    r17, r11, 5          ; mapa bits
+
+        or      r14, r0, 0           ; pos texto
+        or      r15, r0, 0           ; pos zona3
+        or      r16, r0, 0           ; num bit
+
+CopIniC:
+        cmp     r5, r14, r12
+        bb1     hs, r5, FinBuildC
+
+        cmp     r5, r14, 8
+        bb1     hs, r5, BucC
+
+        ld.bu   r21, r10, r14
+        st.b    r21, r18, r15
+
+        addu    r14, r14, 1
+        addu    r15, r15, 1
+        br      CopIniC
+
+BucC:
+        cmp     r5, r14, r12
+        bb1     hs, r5, FinBuildC
+
+        divu    r22, r16, 8          ; byte mapa
+        mulu    r23, r22, 8
+        subu    r24, r16, r23        ; resto bit
+
+        cmp     r5, r24, 0
+        bb1     ne, r5, NoInitMC
+
+        or      r25, r0, 0
+        st.b    r25, r17, r22        ; nuevo byte mapa a 0
+
+NoInitMC:
+        PUSH    (r10)
+        PUSH    (r11)
+        PUSH    (r12)
+        PUSH    (r13)
+        PUSH    (r14)
+        PUSH    (r15)
+        PUSH    (r16)
+        PUSH    (r17)
+        PUSH    (r18)
+        PUSH    (r19)
+
+        PUSH    (r19)                ; dir P
+        PUSH    (r14)                ; max
+        PUSH    (r10)                ; texto
+        bsr     BuscaMax
+        addu    r30, r30, 12         ; quito params
+
+        POP     (r19)
+        POP     (r18)
+        POP     (r17)
+        POP     (r16)
+        POP     (r15)
+        POP     (r14)
+        POP     (r13)
+        POP     (r12)
+        POP     (r11)
+        POP     (r10)
+
+        or      r20, r29, r29        ; L
+        ld      r24, r19, 0          ; P
+
+        cmp     r5, r20, 4
+        bb1     lt, r5, LitC
+
+RefC:
+        PUSH    (r10)
+        PUSH    (r11)
+        PUSH    (r12)
+        PUSH    (r13)
+        PUSH    (r14)
+        PUSH    (r15)
+        PUSH    (r16)
+        PUSH    (r17)
+        PUSH    (r18)
+        PUSH    (r19)
+        PUSH    (r20)
+        PUSH    (r24)
+
+        PUSH    (r16)                ; num bit
+        PUSH    (r17)                ; mapa
+        bsr     PoneBitA1
+        addu    r30, r30, 8
+
+        POP     (r24)
+        POP     (r20)
+        POP     (r19)
+        POP     (r18)
+        POP     (r17)
+        POP     (r16)
+        POP     (r15)
+        POP     (r14)
+        POP     (r13)
+        POP     (r12)
+        POP     (r11)
+        POP     (r10)
+
+        divu    r25, r24, 256        ; P high
+        mulu    r26, r25, 256
+        subu    r21, r24, r26        ; P low
+
+        st.b    r21, r18, r15        ; P low
+        addu    r15, r15, 1
+        st.b    r25, r18, r15        ; P high
+        addu    r15, r15, 1
+        st.b    r20, r18, r15        ; L
+        addu    r15, r15, 1
+
+        addu    r14, r14, r20        ; avanzo L chars
+        addu    r16, r16, 1          ; siguiente bit
+        br      BucC
+
+LitC:
+        ld.bu   r21, r10, r14
+        st.b    r21, r18, r15
+
+        addu    r14, r14, 1
+        addu    r15, r15, 1
+        addu    r16, r16, 1
+        br      BucC
+
+FinBuildC:
+        addu    r22, r16, 7          ; bytes mapa
+        divu    r22, r22, 8
+
+        divu    r25, r12, 256        ; long high
+        mulu    r26, r25, 256
+        subu    r21, r12, r26        ; long low
+
+        st.b    r21, r11, 0
+        st.b    r25, r11, 1
+
+        or      r21, r0, 1
+        st.b    r21, r11, 2          ; M
+
+        addu    r23, r22, 5          ; offset zona3
+
+        divu    r25, r23, 256
+        mulu    r26, r25, 256
+        subu    r21, r23, r26
+
+        st.b    r21, r11, 3          ; offset low
+        st.b    r25, r11, 4          ; offset high
+
+        addu    r24, r11, r23        ; destino zona3
+        or      r25, r0, 0           ; i copia
+
+CopZona3C:
+        cmp     r5, r25, r15
+        bb1     hs, r5, FinC
+
+        ld.bu   r21, r18, r25
+        st.b    r21, r24, r25
+
+        addu    r25, r25, 1
+        br      CopZona3C
+
+FinC:
+        addu    r29, r23, r15        ; tam total
+
+        or      r30, r31, 0
+        POP     (r31)
+        POP     (r1)
         jmp     (r1)
+
+
 ;------------------------
 LeeBit:
         PUSH    (r1)
