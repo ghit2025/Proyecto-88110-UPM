@@ -26,32 +26,16 @@ ENDMACRO
 
 
 ; =========================
-; datos prueba LongCad
+; pruebas que hemos ido usando
 ; =========================
-;        org 0x8000
-;
-;CAD1:
-;       data "Prueba\0"
-
-
-
-; =========================
-; datos prueba BuscaCar
-; =========================
-
-;        org 0x8000
-
-;CAR1:
-;        data 0x2A                 ; codigo ascii de *
-;
-;REF1:
-;        data "*2345*78*0\0"
-;
-;FROM1:
-;        data 4
-;
-;TO1:
-;        data 10
+; LongCad: "Prueba\0" -> 6
+; BuscaCar: busca '*' en "*2345*78*0\0" desde 4 hasta 10 -> 5
+; CoincidenCad: "abcde\0" con "abcXX\0" -> 3
+; PoneBitA1: mapa 0x00, bit 3 -> 0x10
+; LeeBit: mapa 0x54, bit 3 -> 1 y bit 4 -> 0
+; Descomprime: caso sin referencias y caso largo de "tres tristes..."
+; Comprime: "0123456789\0" -> tam 0x10 y caso largo -> tam 0x46
+; Verifica: texto largo -> 0, long1 = long2 = 0x44
 
 ; =========================
 ; datos prueba 
@@ -61,9 +45,9 @@ ENDMACRO
     org 0x8000
 
 TXT1:
-        data "0123456789\0"
+        data "tres tristes tigres comen trigo en un trigal, el primer tigre que...\0"
 
-        org 0x8100
+    org 0x8100
 
 LONG1:
         data 0
