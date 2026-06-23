@@ -12,12 +12,12 @@ POP: MACRO(reg)
         addu    r30, r30, 4 ; 2. Cerrar el hueco (subir 4 escalones)
 ENDMACRO
 
-LEA: MACRO(reg, etq) ;Load Effective Address = Dame la dirección postal
+LEA: MACRO(reg, etq) ;Load Effective Address = Dame la dirección 
         or      reg, r0, low(etq) ; 1. Pega la mitad baja
         or.u    reg, reg, high(etq ) ; 2. Pega la mitad alta
 ENDMACRO
 
-LOAD: MACRO(reg, etq) ;Dame el contenido de esa dirección = Abre el buzón
+LOAD: MACRO(reg, etq) ;Dame el contenido de esa dirección 
         or      reg, r0, low(etq)
         or.u    reg, reg, high(etq) ; hasta aqui es lo mismo que el macro LEA
         ld      reg, reg, 0 ; Aqui carga en reg los contenidos que hay en la direccion reg 
@@ -29,12 +29,26 @@ ENDMACRO
 ; pruebas que hemos ido usando
 ; =========================
 ; LongCad: "Prueba\0" -> 6
+; Le pasamos la cadena "Prueba\0" y comprobamos que devuelve 6. Simplemente nos aseguramos de que cuenta los caracteres exactos antes de cruzarse con el terminador nulo, algo basico para saber el tamaño del bloque que vamos a procesar.
+
 ; BuscaCar: busca '*' en "*2345*78*0\0" desde 4 hasta 10 -> 5
+; Le pedimos que busque el caracter '*' dentro de la cadena, limitando la de busqueda desde el indice 4 (from) hasta el 10 (to). Nos devuelve un 5 porque el primer asterisco a partir de la posicion 4 esta justo en la posicion 5. Esto nos simula la busqueda hacia atras en la ventana del algoritmo.
+
 ; CoincidenCad: "abcde\0" con "abcXX\0" -> 3
+; Cruzamos "abcde\0" con "abcXX\0". Nos tiene que dar 3 porque el bucle avanza mientras coinciden y rompe en el cuarto caracter (la 'd' contra la 'X'). Usamos esto para calcular la longitud de la coincidencia y decidir si nos compensa comprimirla o no.
+
 ; PoneBitA1: mapa 0x00, bit 3 -> 0x10
+; Arrancamos con un mapa de bits a cero (0x00) y le decimos que encienda el bit 3. El resultado es 0x10. Esto es vital para ir construyendo nuestro mapa de bits binario donde marcaremos con unos y ceros si lo que guardamos es una referencia comprimida o un caracter literal.
+
 ; LeeBit: mapa 0x54, bit 3 -> 1 y bit 4 -> 0
+; Le pasamos el mapa 0x54 y vemos si lee bien. Comprobamos que al leer el bit 3 nos saca un 1, y al leer el bit 4 nos saca un 0. Lo usaremos en la descompresion para ir mirando ese mapa y saber que rutina toca ejecutar.
+
 ; Descomprime: caso sin referencias y caso largo de "tres tristes..."
+; Evaluamos la subrutina gorda con dos escenarios. Primero un caso sin referencias hacia atras para ver el comportamiento basico, y luego el caso largo del trabalenguas para garantizar que reconstruye los patrones repetidos de forma impecable usando la informacion del mapa.
+
 ; Comprime: "0123456789\0" -> tam 0x10 y caso largo -> tam 0x46
+; La operacion inversa. Metemos primero la cadena "0123456789\0", que como no tiene ningun patron repetido no se puede comprimir casi nada y nos deja un tamaño total de 0x10. Luego le tiramos el caso largo con repeticiones y comprobamos que el algoritmo hace su magia dejando el tamaño en solo 0x46.
+
 ; Verifica: texto largo -> 0, long1 = long2 = 0x44
 
 ; =========================
@@ -84,21 +98,22 @@ ppal:
 ; LongCad: Cuenta los caracteres de una cadena hasta encontrar un \0
 
 LongCad: 
-        PUSH    (r1)
-        PUSH    (r31)
-        or      r31, r30, 0          ; nuevo fp
+;// ANTES DE NADA CREAMOS EL MARCO DE PILA
+        PUSH    (r1)    ; // guardamos r1 (direccion de retorno)
+        PUSH    (r31)           ; // guardamos r31 (fp del llamante)
+        or      r31, r30, 0          ; // sobreescribimos r31. ahora nuestro fp apunta a la base de nuestro marco de pila
 
-        ld      r10, r31, 8          ; cadena
-        or      r29, r0, 0           ; contador
+        ld      r10, r31, 8  ; // cargamos el puntero que apunta a la cadena, 8 porque si vemos la pila, r31 apunta a r31 viejo, encima tiene a r1 (+4) y encima a donde queremos ir (+8)
+        or      r29, r0, 0    ; ; // uso r29 para inicializar mi contador y lo inicializo en 0. lo metemos en r29 porque es el registro que usamos siempre para devolver resultados como dice el enuciado
 
 BucLC:
-        ld.bu   r11, r10, r29        ; cadena[contador]
-        cmp     r12, r11, 0
-        bb1     eq, r12, FinLC       ; si es 0, fin
-
-        addu    r29, r29, 1          ; contador++
-        br      BucLC
-
+        ld.bu   r11, r10, r29    ; // cargamos el elemento de la cadena. OJO usamos ld.bu (byte unsigned) en vez de ld normal porque es texto y cada caracter ocupa solo 1 byte, no 4 bytes como los enteros. usamos r11 temporalmente
+       ;// METODO SANTI hacemos el cmp antes de nada
+        cmp     r12, r11, 0    ; // comparo en r12 si el caracter que acabo de cargar es el \0 (que vale 0)
+        bb1     eq, r12, FinLC       ; // si son iguales fin del bucle, salto a FinLC para terminar
+        addu    r29, r29, 1          ; oJO sumamos 1 y no 4 porque como leemos con ld.bu, avanzamos en memoria byte a byte
+        br      BucLC ;volvemos al bucle para leer el siguiente caracter
+;// DESTRUIMOS EL MARCO DE PILA
 FinLC:
         or      r30, r31, 0
         POP     (r31)
@@ -114,31 +129,32 @@ FinLC:
 BuscaCar:
         PUSH    (r1)
         PUSH    (r31)
-        or      r31, r30, 0          ; fp fijo
-
-        ld      r10, r31, 8          ; C
-        ld      r11, r31, 12         ; ref
-        ld      r12, r31, 16         ; i = from
-        ld      r13, r31, 20         ; to
+        or      r31, r30, 0   ; lo mismo que antes, creamos marco de pila y guardamos r1 y r31
+;//// AHORA TOCA CARGAR COSAS que son los parametros
+        ld      r10, r31, 8   ; // cargamos el caracter a buscar (C). 8 porque si vemos la pila, r31 apunta a r31 viejo, encima tiene a r1 (+4) y encima al 1º parametro (+8)
+        ld      r11, r31, 12   ; // cargamos el puntero que apunta a la cadena de referencia (ref). 12 porque esta justo encima del anterior
+        ld      r12, r31, 16  ; // cargamos el indice inicial (from) y lo uso como mi iterador 'i'. offset 16 en la pila
+        ld      r13, r31, 20  ; // cargamos el limite del bucle (to). offset 20 porque es el ultimo parametro que nos pasaron
 
 BucBC:
-        cmp     r5, r12, r13
-        bb1     hs, r5, NoBC         ; si i >= to
+;// METODO SANTI hacemos el cmp antes de nada por si i ya es igual o mayor que el limite 'to'
+        cmp     r5, r12, r13 ; // comparo en r5 nuestro iterador i (r12) con el limite to (r13)
+        bb1     hs, r5, NoBC    ; si i >= to (hs = higher or same), fin
 
-        ld.bu   r14, r11, r12        ; ref[i]
-        cmp     r5, r14, r10
+        ld.bu   r14, r11, r12  ;    // cargamos el caracter de la cadena. usamos ld.bu porque es texto y cada caracter ocupa 1 byte. sumamos la base r11 mas el offset del indice actual r12
+        cmp     r5, r14, r10 ; // comparo en r5 si el caracter que acabo de cargar (r14) es el que busco (r10)
         bb1     eq, r5, SiBC         ; encontrado
 
-        addu    r12, r12, 1          ; i++
+        addu    r12, r12, 1   ; ahora estamos en el caso de que sean iguales entonces i++ acordarse que 1 porque es byte a byte
         br      BucBC
 
 SiBC:
-        or      r29, r12, r12        ; retorno = i
-        br      FinBC
+        or      r29, r12, r12    ; // si lo encuentro, mi resultado es la posicion donde esta (i). lo metemos en r29 porque es el registro que usamos siempre para devolver resultados
+        br      FinBC      ; // salto al fin para no comerme el codigo del NoBC y poder destruir el marco
 
 NoBC:
-        or      r29, r13, r13        ; retorno = to
-
+        or      r29, r13, r13  ; // si no lo encuentro, nos dice el enunciado que devolvamos 'to'. lo guardo en r29
+;// DESTRUIMOS EL MARCO DE PILA
 FinBC:
         or      r30, r31, 0
         POP     (r31)
@@ -148,61 +164,67 @@ FinBC:
 ;-----------
 
 CoincidenCad:
+;lo de siempre, creamos marco de pila y guardamos r1 y r31
         PUSH    (r1)
         PUSH    (r31)
         or      r31, r30, 0          ; fp fijo
-
+; lo de siempre, cargamos los parametros
         ld      r10, r31, 8          ; cad1
         ld      r11, r31, 12         ; cad2
         or      r29, r0, 0           ; contador
 
 BucCC:
-        ld.bu   r12, r10, r29        ; cad1[i]
-        ld.bu   r13, r11, r29        ; cad2[i]
+        ld.bu   r12, r10, r29        ; // cargamos el caracter de cad1. usamos ld.bu porque es texto (1 byte). sumamos base r10 mas mi contador r29
+        ld.bu   r13, r11, r29        ; // cargamos el caracter de cad2 de la misma forma, usando base r11
 
-        cmp     r5, r12, r13
-        bb1     ne, r5, FinCC        ; si son distintos
+        // comprobaciones de salida rapida antes de avanzar
+        cmp     r5, r12, r13       ; // comparo en r5 si los dos caracteres cargados son iguales
+        bb1     ne, r5, FinCC     ; // si son distintos (ne), fin del bucle, ya no coinciden mas
 
-        cmp     r5, r12, 0
-        bb1     eq, r5, FinCC        ; si llego a fin
+        cmp     r5, r12, 0     ; // comparo si hemos llegado al final de la cadena (\0 que vale 0). solo miro r12 porque si paso el filtro anterior, r12 y r13 son iguales
+        bb1     eq, r5, FinCC     ; // si he llegado al final, salto a destruir el marco
 
-        addu    r29, r29, 1          ; contador++
-        br      BucCC
+        addu    r29, r29, 1       ; // si coinciden y no es fin de cadena, aumento mi iterador (contador+1). sumamos 1 porque al ser texto avanzamos byte a byte
+        br      BucCC             ; // vuelvo al bucle inicial y ocurre todito otra vez
 
+// DESTRUIMOS EL MARCO DE PILA
 FinCC:
-        or      r30, r31, 0
+        or      r30, r31, 0        ; // restauro el sp
         POP     (r31)
         POP     (r1)
-        jmp     (r1)
+        jmp     (r1)    ; // salto de vuelta
 ;---------
 
 
-PoneBitA1:
+PoneBitA1: ;lo de siempre primero
         PUSH    (r1)
         PUSH    (r31)
         or      r31, r30, 0          ; fp fijo
 
         ld      r10, r31, 8          ; dir mapa
         ld      r11, r31, 12         ; num bit
-
-        divu    r12, r11, 8          ; byte = numbit / 8
+; esto lo hacemos 
+        divu    r12, r11, 8          ; b; // calculo en que byte cae haciendo numbit / 8
         mulu    r13, r12, 8
-        subu    r14, r11, r13        ; resto = numbit % 8
+        subu    r14, r11, r13    ; // saco el resto (numbit % 8) para saber su posicion exacta dentro de ese byte
 
-        or      r15, r0, 0x80        ; mascara inicial
+        or      r15, r0, 0x80        ; mascara creo una mascara inicial 0x80 (10000000 en binario) para luego mover el 1 a su sitio
 
-BucPBA1:
-        cmp     r5, r14, 0
-        bb1     eq, r5, FinBucPBA1
+// METODO SANTI compruebo al principio
+        cmp     r5, r14, 0      ; // comparo si el resto ya es 0
+        bb1     eq, r5, FinBucPBA1   ; // si es 0, la mascara ya esta en su sitio y salgo
 
-        divu    r15, r15, 2          ; mascara / 2
-        subu    r14, r14, 1
-        br      BucPBA1
+        divu    r15, r15, 2    ; // divido la mascara entre 2 para desplazar el '1' un hueco a la derecha
+        subu    r14, r14, 1          ; // resto--
+        br      BucPBA1        ; // repito hasta que el resto sea 0
 
+// APLICAMOS MASCARA Y GUARDAMOS
 FinBucPBA1:
-        ld.bu   r16, r10, r12        ; byte actual
-        or      r16, r16, r15        ; pongo bit a 1
-        st.b    r16, r10, r12        ; guardo byte
+        ld.bu   r16, r10, r12        ; // cargo el byte exacto del mapa. uso ld.bu porque leo solo 1 byte, sumando base (r10) + offset del byte (r12)
+        or      r16, r16, r15        ; // aplico la mascara con un OR para forzar a 1 solo ese bit sin tocar los demas
+        st.b    r16, r10, r12        ; // guardo en memoria. OJO uso st.b (store byte) porque solo sobreescribo 1 byte, si usara st normal machacaria 4 bytes de golpe
+
+// DESTRUIMOS EL MARCO DE PILA
 
         or      r30, r31, 0
         POP     (r31)
